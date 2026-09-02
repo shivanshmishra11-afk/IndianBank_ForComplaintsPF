@@ -78,14 +78,16 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-[#1E293B] flex flex-col font-sans selection:bg-blue-900 selection:text-white">
-      {/* Universal India Bank NetBanking Header */}
-      <Navbar
-        currentView={currentView}
-        onNavigate={(view) => setCurrentView(view)}
-        user={user}
-        onLogout={handleLogout}
-        ticketCount={recentTickets.length}
-      />
+      {/* Universal India Bank NetBanking Header (rendered on login & complaint portal) */}
+      {currentView !== 'dashboard' && (
+        <Navbar
+          currentView={currentView}
+          onNavigate={(view) => setCurrentView(view)}
+          user={user}
+          onLogout={handleLogout}
+          ticketCount={recentTickets.length}
+        />
+      )}
 
       {/* Main Single-Page View Container */}
       <main className="flex-1 flex flex-col relative">
@@ -95,6 +97,17 @@ export default function App() {
             id="container-view-login"
             className={currentView === 'login' ? 'flex-1 flex flex-col' : 'hidden'}
           >
+            {user && (
+              <div className="bg-[#0A1E3F] border-b border-blue-900 text-white px-4 py-2.5 text-xs text-center flex items-center justify-center gap-3 shadow-xs">
+                <span>Active Session: <strong>{user.name}</strong> ({user.email})</span>
+                <button
+                  onClick={() => setCurrentView('dashboard')}
+                  className="px-3.5 py-1 bg-amber-400 text-slate-950 font-bold rounded-full hover:bg-amber-300 transition-all cursor-pointer shadow-xs"
+                >
+                  Return to Dashboard &rarr;
+                </button>
+              </div>
+            )}
             <LoginView
               onLogin={handleLogin}
               savedEmail={
@@ -108,13 +121,16 @@ export default function App() {
           {/* VIEW 2: Customer Dashboard */}
           <div
             id="container-view-dashboard"
-            className={currentView === 'dashboard' ? 'block' : 'hidden'}
+            className={currentView === 'dashboard' ? 'block flex-1' : 'hidden'}
           >
             {user && (
               <DashboardView
                 user={user}
                 onNavigateToComplaint={() => setCurrentView('complaint')}
                 recentTickets={recentTickets}
+                onLogout={handleLogout}
+                onTicketCreated={handleTicketCreated}
+                onNavigateToLogin={() => setCurrentView('login')}
               />
             )}
           </div>
@@ -135,30 +151,32 @@ export default function App() {
         </ErrorBoundary>
       </main>
 
-      {/* India Bank Institutional Footer */}
-      <footer className="border-t border-slate-200 bg-white py-6 text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-serif font-bold text-slate-800">India Bank</span>
-            <span>&bull;</span>
-            <span>A Scheduled Commercial Bank Licensed by RBI</span>
-            <span>&bull;</span>
-            <span className="text-emerald-700 font-medium flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              Deposits Insured by DICGC (upto ₹5,00,000)
-            </span>
-          </div>
-
-          <div className="flex items-center gap-4 text-xs text-slate-600">
-            <div className="flex items-center gap-1.5 font-medium text-slate-700">
-              <PhoneCall className="w-3.5 h-3.5 text-amber-600" />
-              <span>24x7 Care: <strong>1800 202 6161</strong></span>
+      {/* India Bank Institutional Footer (rendered on login & complaint portal) */}
+      {currentView !== 'dashboard' && (
+        <footer className="border-t border-slate-200 bg-white py-6 text-xs text-slate-500">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-serif font-bold text-slate-800">India Bank</span>
+              <span>&bull;</span>
+              <span>A Scheduled Commercial Bank Licensed by RBI</span>
+              <span>&bull;</span>
+              <span className="text-emerald-700 font-medium flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                Deposits Insured by DICGC (upto ₹5,00,000)
+              </span>
             </div>
-            <span>&bull;</span>
-            <span>CIN: L65110MH1994PLC080801</span>
+
+            <div className="flex items-center gap-4 text-xs text-slate-600">
+              <div className="flex items-center gap-1.5 font-medium text-slate-700">
+                <PhoneCall className="w-3.5 h-3.5 text-amber-600" />
+                <span>24x7 Care: <strong>1800 202 6161</strong></span>
+              </div>
+              <span>&bull;</span>
+              <span>CIN: L65110MH1994PLC080801</span>
+            </div>
           </div>
-        </div>
-      </footer>
+        </footer>
+      )}
     </div>
   );
 }

@@ -25,8 +25,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, savedEmail = '' }
   const [step, setStep] = useState<'credentials' | 'otp'>('credentials');
 
   // Credentials state
-  const [email, setEmail] = useState(savedEmail || 'shivansh.mishra@intellectdesign.com');
-  const [password, setPassword] = useState('Intellect@8012');
+  const [email, setEmail] = useState(savedEmail || 'ananya.sharma@indiabank.com');
+  const [password, setPassword] = useState('IndiaBank@2026');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
@@ -315,14 +315,25 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, savedEmail = '' }
                 <div className="flex flex-col gap-1.5">
                   <button
                     type="button"
+                    onClick={() => handleQuickFill('ananya.sharma@indiabank.com')}
+                    className="w-full text-left px-3 py-2 rounded-lg bg-indigo-50/60 hover:bg-indigo-100/60 border border-indigo-200/80 text-xs text-indigo-950 transition-colors flex items-center justify-between cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <KeyRound className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                      <span className="truncate font-medium">ananya.sharma@indiabank.com (Ananya Sharma)</span>
+                    </div>
+                    <span className="text-[10px] text-indigo-600 uppercase font-mono font-bold shrink-0 ml-2">Fill</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => handleQuickFill('shivansh.mishra@intellectdesign.com')}
                     className="w-full text-left px-3 py-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200/80 text-xs text-slate-700 transition-colors flex items-center justify-between cursor-pointer"
                   >
                     <div className="flex items-center gap-2 truncate">
-                      <KeyRound className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                      <KeyRound className="w-3.5 h-3.5 text-slate-600 shrink-0" />
                       <span className="truncate font-medium">shivansh.mishra@intellectdesign.com</span>
                     </div>
-                    <span className="text-[10px] text-blue-600 uppercase font-mono font-bold shrink-0 ml-2">Fill</span>
+                    <span className="text-[10px] text-slate-600 uppercase font-mono font-bold shrink-0 ml-2">Fill</span>
                   </button>
                   <button
                     type="button"

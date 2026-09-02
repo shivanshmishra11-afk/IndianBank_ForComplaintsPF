@@ -1,26 +1,45 @@
 export type ViewType = 'login' | 'dashboard' | 'complaint';
 
+export type NavTab =
+  | 'home'
+  | 'accounts'
+  | 'complaints'
+  | 'cards'
+  | 'payments'
+  | 'transfers'
+  | 'investments'
+  | 'loans'
+  | 'offers'
+  | 'services';
+
 export interface UserSession {
   email: string;
   name: string;
+  firstName?: string;
   accountNumber: string;
   loginTime: string;
+  avatarUrl?: string;
 }
 
 export interface BankAccount {
   id: string;
   name: string;
-  type: string;
+  type: 'Savings' | 'Current' | 'Fixed Deposit' | 'Recurring Deposit';
   accountNumber: string;
+  maskedNumber: string;
   routingNumber: string;
   balance: number;
   currency: string;
   status: 'Active' | 'Locked' | 'Review';
+  color?: string;
+  maturityDate?: string;
+  interestRate?: string;
 }
 
 export interface Transaction {
   id: string;
   date: string;
+  rawDate?: string;
   description: string;
   merchant: string;
   category: string;
@@ -28,7 +47,72 @@ export interface Transaction {
   type: 'debit' | 'credit';
   status: 'Completed' | 'Pending' | 'Flagged';
   reference: string;
-  iconName?: string;
+  iconType?: 'amazon' | 'salary' | 'swiggy' | 'electricity' | 'netflix' | 'shopping' | 'transfer' | 'food' | 'bills';
+}
+
+export interface QuickPayee {
+  id: string;
+  name: string;
+  vpa?: string;
+  accountNumber?: string;
+  avatar: string;
+  bank?: string;
+  bankName?: string;
+}
+
+export interface BankOffer {
+  id: string;
+  title: string;
+  category: string;
+  tag: string;
+  discount: string;
+  expiry: string;
+  description: string;
+  color: string;
+  code?: string;
+}
+
+export interface SpendingCategory {
+  id: string;
+  name: string;
+  amount: number;
+  color: string;
+  percentage: number;
+}
+
+export interface CreditScoreData {
+  score: number;
+  maxScore: number;
+  rating: 'Excellent' | 'Good' | 'Fair' | 'Poor';
+  updatedDate: string;
+  factors: {
+    paymentHistory: number; // 100%
+    creditUtilization: number; // 14%
+    creditAge: string; // 4.2 years
+    totalAccounts: number; // 6
+    hardInquiries: number; // 1
+  };
+}
+
+export interface BankCard {
+  id: string;
+  type: 'Credit' | 'Debit';
+  cardName: string;
+  cardNumber: string;
+  maskedNumber: string;
+  cardHolder: string;
+  expiry: string;
+  cvv: string;
+  network: 'Visa' | 'Mastercard' | 'RuPay';
+  tier: 'Signature' | 'Platinum' | 'Infinite';
+  status: 'Active' | 'Frozen';
+  creditLimit?: number;
+  availableCredit?: number;
+  domesticLimit: number;
+  internationalEnabled: boolean;
+  contactlessEnabled: boolean;
+  rewardPoints: number;
+  gradient: string;
 }
 
 export interface ComplaintSubmission {
@@ -58,3 +142,4 @@ export interface ApiSubmissionResult {
   gatewayResponse?: any;
   error?: string;
 }
+
