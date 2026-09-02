@@ -199,14 +199,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             {/* Action Buttons Row */}
             <div id="quick-transfer-action" className="mt-5 pt-4 border-t border-blue-900/80 flex flex-wrap items-center gap-2.5">
               <button
-                onClick={() => alert('Quick IMPS / NEFT Transfer: Direct beneficiary transfer initiated for AC1000234567.')}
+                onClick={() => {
+                  setStatementSuccessMsg('Quick IMPS / NEFT Transfer: Direct beneficiary transfer modal initiated for AC1000234567.');
+                  setTimeout(() => setStatementSuccessMsg(''), 5000);
+                }}
                 className="px-3.5 py-2 rounded-lg bg-blue-900 hover:bg-blue-850 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border border-blue-800"
               >
                 <Send className="w-3.5 h-3.5 text-amber-400" />
                 Transfer Funds (IMPS/NEFT)
               </button>
               <button
-                onClick={() => alert('UPI Quick Pay: Scan any UPI QR code or enter VPA.')}
+                onClick={() => {
+                  setStatementSuccessMsg('UPI Quick Pay: UPI QR and VPA transfer initiated for AC1000234567.');
+                  setTimeout(() => setStatementSuccessMsg(''), 5000);
+                }}
                 className="px-3.5 py-2 rounded-lg bg-blue-900 hover:bg-blue-850 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border border-blue-800"
               >
                 <CreditCard className="w-3.5 h-3.5 text-emerald-400" />

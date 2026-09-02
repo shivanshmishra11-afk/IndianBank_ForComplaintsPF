@@ -8,6 +8,17 @@ const PORT = 3000;
 
 app.use(express.json());
 
+// Enable CORS for all incoming requests (crucial for iframe preview & asset loading)
+app.use((_req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+  if (_req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 // API health endpoint
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", bank: "Intellect Bank" });

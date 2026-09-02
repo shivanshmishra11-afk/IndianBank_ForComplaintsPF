@@ -52,6 +52,7 @@ export interface ComplaintTicket {
 export interface ApiSubmissionResult {
   success: boolean;
   trace_id: string;
+  timestamp?: string;
   liveApi?: boolean;
   apiNotice?: string;
   gatewayResponse?: any;

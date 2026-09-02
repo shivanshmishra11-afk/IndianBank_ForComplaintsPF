@@ -13,6 +13,7 @@ import {
   RefreshCw,
   Sparkles
 } from 'lucide-react';
+import { safeStorage } from '../utils/storage';
 
 interface LoginViewProps {
   onLogin: (email: string) => void;
@@ -76,15 +77,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, savedEmail = '' }
 
     setIsSubmitting(true);
 
-    // Save to localStorage as requested
-    try {
-      if (rememberMe) {
-        localStorage.setItem('intellect_bank_remember_email', trimmedEmail);
-      } else {
-        localStorage.removeItem('intellect_bank_remember_email');
-      }
-    } catch {
-      // safe fallback
+    // Save to safeStorage
+    if (rememberMe) {
+      safeStorage.setItem('intellect_bank_remember_email', trimmedEmail);
+    } else {
+      safeStorage.removeItem('intellect_bank_remember_email');
     }
 
     // Move to Step 2: 6-Digit OTP Verification
@@ -166,12 +163,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, savedEmail = '' }
     setIsVerifyingOtp(true);
     setOtpError('');
 
-    // Save session email to localStorage
-    try {
-      localStorage.setItem('intellect_bank_user_email', email.trim());
-    } catch {
-      // safe fallback
-    }
+    // Save session email to safeStorage
+    safeStorage.setItem('intellect_bank_user_email', email.trim());
 
     // Tactile verification delay for authentic banking experience
     setTimeout(() => {
@@ -400,7 +393,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, savedEmail = '' }
                   {otp.map((digit, idx) => (
                     <input
                       key={idx}
-                      ref={(el) => (inputRefs.current[idx] = el)}
+                      ref={(el) => {
+                        inputRefs.current[idx] = el;
+                      }}
                       type="text"
                       inputMode="numeric"
                       pattern="[0-9]*"

@@ -10,7 +10,8 @@ import { LoginView } from './components/LoginView';
 import { DashboardView } from './components/DashboardView';
 import { ComplaintView } from './components/ComplaintView';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { ShieldCheck, PhoneCall, Lock } from 'lucide-react';
+import { ShieldCheck, PhoneCall } from 'lucide-react';
+import { safeStorage } from './utils/storage';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<ViewType>('login');
@@ -21,8 +22,8 @@ export default function App() {
   useEffect(() => {
     try {
       const storedEmail =
-        localStorage.getItem('indiabank_user_email') ||
-        localStorage.getItem('intellect_bank_user_email');
+        safeStorage.getItem('indiabank_user_email') ||
+        safeStorage.getItem('intellect_bank_user_email');
 
       if (storedEmail) {
         const namePart = storedEmail.split('@')[0] || 'Client';
@@ -58,23 +59,15 @@ export default function App() {
       loginTime: new Date().toLocaleTimeString('en-IN'),
     };
 
-    try {
-      localStorage.setItem('indiabank_user_email', email);
-    } catch {
-      // safe fallback
-    }
+    safeStorage.setItem('indiabank_user_email', email);
 
     setUser(newSession);
     setCurrentView('dashboard');
   };
 
   const handleLogout = () => {
-    try {
-      localStorage.removeItem('indiabank_user_email');
-      localStorage.removeItem('intellect_bank_user_email');
-    } catch {
-      // safe fallback
-    }
+    safeStorage.removeItem('indiabank_user_email');
+    safeStorage.removeItem('intellect_bank_user_email');
     setUser(null);
     setCurrentView('login');
   };
@@ -105,8 +98,8 @@ export default function App() {
             <LoginView
               onLogin={handleLogin}
               savedEmail={
-                localStorage.getItem('indiabank_remember_email') ||
-                localStorage.getItem('intellect_bank_remember_email') ||
+                safeStorage.getItem('indiabank_remember_email') ||
+                safeStorage.getItem('intellect_bank_remember_email') ||
                 ''
               }
             />

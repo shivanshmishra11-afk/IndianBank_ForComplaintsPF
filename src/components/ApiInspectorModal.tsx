@@ -18,8 +18,16 @@ export const ApiInspectorModal: React.FC<ApiInspectorModalProps> = ({ isOpen, on
     setTestingGateway(true);
     try {
       const res = await fetch('/api/complaint/gateway-status');
-      const data = await res.json();
-      setGatewayResult(data);
+      if (res.headers.get('content-type')?.includes('application/json')) {
+        const data = await res.json();
+        setGatewayResult(data);
+      } else {
+        setGatewayResult({
+          notice: 'GitHub Pages / Static Hosting Detected',
+          message: 'Express backend (/api) is active when run in Node environment. Static UI features are fully operational.',
+          status: 'Static Preview',
+        });
+      }
     } catch (err: any) {
       setGatewayResult({ error: err.message });
     } finally {
@@ -31,8 +39,16 @@ export const ApiInspectorModal: React.FC<ApiInspectorModalProps> = ({ isOpen, on
     setTestingAssets(true);
     try {
       const res = await fetch('/api/complaint/assets');
-      const data = await res.json();
-      setAssetsResult(data);
+      if (res.headers.get('content-type')?.includes('application/json')) {
+        const data = await res.json();
+        setAssetsResult(data);
+      } else {
+        setAssetsResult({
+          notice: 'GitHub Pages / Static Hosting Detected',
+          message: 'Static preview mode active. Asset discovery API available with Express server.',
+          status: 'Static Preview',
+        });
+      }
     } catch (err: any) {
       setAssetsResult({ error: err.message });
     } finally {
