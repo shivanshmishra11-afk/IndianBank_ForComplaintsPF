@@ -173,15 +173,11 @@ export const NexoraHeader: React.FC<NexoraHeaderProps> = ({
             title="Lodge Grievance, Cheque Inquiries & Dispute Redressal"
           >
             <PhoneCall className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-            <span className="hidden sm:inline">Grievance Desk</span>
+            <span className="hidden sm:inline">Grievance and Dispute</span>
             <span className="sm:hidden">Support</span>
-            {ticketCount > 0 ? (
+            {ticketCount > 0 && (
               <span className="w-4 h-4 bg-red-600 text-white rounded-full text-[10px] font-bold flex items-center justify-center ml-0.5">
                 {ticketCount}
-              </span>
-            ) : (
-              <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-200/60 text-amber-950 font-bold uppercase hidden md:inline">
-                RBI Desk
               </span>
             )}
           </button>

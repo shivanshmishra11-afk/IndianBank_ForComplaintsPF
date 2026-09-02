@@ -26,26 +26,26 @@ export const ServicesView: React.FC<ServicesViewProps> = ({ onOpenGrievance }) =
         </p>
       </div>
 
-      {/* Featured: Official RBI Grievance Desk Banner */}
+      {/* Featured: Official Grievance Desk Banner */}
       <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 text-white shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border border-indigo-900/50">
         <div className="flex items-start gap-4">
           <div className="p-3 bg-red-500/20 text-red-400 rounded-2xl border border-red-500/30 shrink-0">
             <ShieldAlert className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-red-400 bg-red-500/10 px-2.5 py-0.5 rounded-full border border-red-500/20">
-              RBI Integrated Ombudsman Scheme
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+              Guaranteed &lt; 24h Turnaround
             </span>
-            <h3 className="text-lg font-bold text-white mt-1.5">Customer Grievance Redressal Desk</h3>
+            <h3 className="text-lg font-bold text-white mt-1.5">Customer Grievance &amp; Dispute Desk</h3>
             <p className="text-xs text-slate-300 mt-1 max-w-xl">
-              Report failed transactions, unauthorized card charges, UPI disputes, or file an appeal with tracking ticket and SLA resolution.
+              Report failed transactions, cheque issues, statement queries, or card disputes with guaranteed resolution under 24 hours.
             </p>
           </div>
         </div>
 
         <button
           onClick={onOpenGrievance}
-          className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer shrink-0 shadow-sm"
+          className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer shrink-0 shadow-sm"
         >
           <span>Open Grievance Desk</span>
           <ArrowRight className="w-4 h-4" />

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ArrowLeft,
   PhoneCall,
@@ -16,7 +16,13 @@ import {
   Sparkles,
   Paperclip,
   CheckCircle2,
-  X
+  X,
+  Settings,
+  Server,
+  Wifi,
+  WifiOff,
+  ExternalLink,
+  Check
 } from 'lucide-react';
 import { UserSession, ComplaintTicket, ApiSubmissionResult } from '../types';
 import { COMPLAINT_PRODUCT_TYPES } from '../data/mockData';
@@ -38,6 +44,23 @@ export const ComplaintView: React.FC<ComplaintViewProps> = ({
   const [activeTab, setActiveTab] = useState<'lodge' | 'channels' | 'escalation'>('lodge');
   const [attachedFileName, setAttachedFileName] = useState<string>('');
 
+  // Backend Gateway Connectivity states (Solves GitHub Pages static hosting vs Full-Stack Node container)
+  const [customBackendUrl, setCustomBackendUrl] = useState<string>(() => {
+    return localStorage.getItem('IB_BACKEND_URL') || (import.meta.env.VITE_BACKEND_URL as string) || '';
+  });
+  const [backendStatus, setBackendStatus] = useState<
+    'checking' | 'connected' | 'custom_connected' | 'static_github' | 'custom_error'
+  >('checking');
+  const [showBackendModal, setShowBackendModal] = useState<boolean>(false);
+  const [tempBackendInput, setTempBackendInput] = useState<string>(() => {
+    return localStorage.getItem('IB_BACKEND_URL') || (import.meta.env.VITE_BACKEND_URL as string) || '';
+  });
+  const [testPingResult, setTestPingResult] = useState<{
+    testing: boolean;
+    message?: string;
+    success?: boolean;
+  } | null>(null);
+
   // Loading and Workflow states
   const [loadingStep, setLoadingStep] = useState<
     'idle' | 'authenticating' | 'submitting' | 'verifying'
@@ -50,6 +73,120 @@ export const ComplaintView: React.FC<ComplaintViewProps> = ({
   const [submissionTimestamp, setSubmissionTimestamp] = useState<string>('');
 
   const isSubmitting = loadingStep !== 'idle';
+
+  // Check Gateway Health on mount
+  useEffect(() => {
+    let isMounted = true;
+    const verifyGateway = async () => {
+      const savedUrl = localStorage.getItem('IB_BACKEND_URL');
+      if (savedUrl && savedUrl.trim()) {
+        try {
+          const cleanUrl = savedUrl.trim().replace(/\/+$/, '');
+          const res = await fetch(`${cleanUrl}/api/health`, {
+            method: 'GET',
+            signal: AbortSignal.timeout(3500),
+          });
+          if (res.ok) {
+            if (isMounted) setBackendStatus('custom_connected');
+            return;
+          }
+        } catch {
+          if (isMounted) setBackendStatus('custom_error');
+          return;
+        }
+      }
+
+      // Check default relative endpoint
+      try {
+        const res = await fetch('/api/health', {
+          method: 'GET',
+          signal: AbortSignal.timeout(2000),
+        });
+        const ct = res.headers.get('content-type') || '';
+        if (res.ok && ct.includes('application/json')) {
+          if (isMounted) setBackendStatus('connected');
+        } else {
+          if (isMounted) setBackendStatus('static_github');
+        }
+      } catch {
+        if (isMounted) setBackendStatus('static_github');
+      }
+    };
+
+    verifyGateway();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleTestBackendPing = async () => {
+    if (!tempBackendInput.trim()) {
+      setTestPingResult({
+        testing: false,
+        success: false,
+        message: 'Please enter a valid backend URL (e.g., https://your-app.run.app)',
+      });
+      return;
+    }
+    setTestPingResult({ testing: true });
+    try {
+      const cleanUrl = tempBackendInput.trim().replace(/\/+$/, '');
+      const t0 = performance.now();
+      const res = await fetch(`${cleanUrl}/api/health`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(4000),
+      });
+      const latency = Math.round(performance.now() - t0);
+      const ct = res.headers.get('content-type') || '';
+      if (res.ok && ct.includes('application/json')) {
+        const json = await res.json().catch(() => ({}));
+        setTestPingResult({
+          testing: false,
+          success: true,
+          message: `Connected successfully (${latency}ms)! Backend active: "${json?.bank || 'India Bank'} (${json?.status || 'ok'})"`,
+        });
+      } else {
+        setTestPingResult({
+          testing: false,
+          success: false,
+          message: `Endpoint returned HTTP ${res.status} (non-JSON). Make sure this points to your deployed Express backend.`,
+        });
+      }
+    } catch (err: any) {
+      setTestPingResult({
+        testing: false,
+        success: false,
+        message: `Connection failed: ${err.message || 'Network timeout or CORS blocked'}. Ensure CORS is enabled on your backend.`,
+      });
+    }
+  };
+
+  const handleSaveBackendUrl = () => {
+    const cleanUrl = tempBackendInput.trim().replace(/\/+$/, '');
+    if (cleanUrl) {
+      localStorage.setItem('IB_BACKEND_URL', cleanUrl);
+      setCustomBackendUrl(cleanUrl);
+      setBackendStatus('custom_connected');
+    } else {
+      localStorage.removeItem('IB_BACKEND_URL');
+      setCustomBackendUrl('');
+      setBackendStatus('checking');
+    }
+    setShowBackendModal(false);
+    setTestPingResult(null);
+  };
+
+  const handleResetBackendUrl = () => {
+    localStorage.removeItem('IB_BACKEND_URL');
+    setCustomBackendUrl('');
+    setTempBackendInput('');
+    setTestPingResult(null);
+    setShowBackendModal(false);
+    fetch('/api/health')
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then(() => setBackendStatus('connected'))
+      .catch(() => setBackendStatus('static_github'));
+  };
 
   // The 3 user-requested complaint templates
   const sampleTemplates = [
@@ -167,7 +304,7 @@ Thank you,`,
           details: complaintDetails.trim(),
           status: 'Received',
           timestamp: timeString,
-          estimatedResolution: '24 - 48 Hours',
+          estimatedResolution: 'Less than 24 Hours',
           isLiveApi: !!data.liveApi,
           apiNotice: data.apiNotice,
         });
@@ -194,170 +331,173 @@ Thank you,`,
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-      {/* Navigation Breadcrumb */}
-      <div className="flex items-center justify-between gap-4 pb-4 border-b border-slate-200">
+    <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+      {/* Top Header & Breadcrumb */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
         <div className="flex items-center gap-3">
           <button
             onClick={onReturnToDashboard}
-            className="p-2 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 transition-colors cursor-pointer shadow-xs"
+            className="w-10 h-10 rounded-2xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/80 transition-all cursor-pointer shadow-xs flex items-center justify-center shrink-0 hover:border-slate-300"
             title="Return to NetBanking Dashboard"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <div className="flex items-center gap-2 text-xs text-slate-500">
-              <span className="cursor-pointer hover:text-blue-600" onClick={onReturnToDashboard}>
-                Accounts &amp; Deposits
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+              <span className="cursor-pointer hover:text-indigo-600 transition-colors" onClick={onReturnToDashboard}>
+                NetBanking
               </span>
               <span>/</span>
-              <span className="text-slate-800 font-semibold">Customer Care &amp; Grievance Redressal</span>
+              <span className="text-slate-700">Customer Support Desk</span>
             </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 font-serif mt-0.5">
-              India Bank Customer Support &amp; Grievance Portal
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mt-0.5">
+              Customer Support &amp; Grievance Redressal
             </h1>
           </div>
         </div>
 
-        <div className="hidden sm:flex items-center gap-2 text-xs bg-amber-50 text-amber-900 border border-amber-200 px-3 py-1.5 rounded-lg">
-          <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
-          <span>RBI Customer Charter Compliant</span>
+        <div className="inline-flex items-center gap-2 text-xs bg-emerald-50 text-emerald-900 border border-emerald-200/90 px-3.5 py-1.5 rounded-full font-bold shadow-2xs self-start sm:self-auto">
+          <Clock className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>Turnaround Time: Less than 24 Hours</span>
         </div>
       </div>
 
-      {/* 24x7 Customer Calling Helplines Banner (Modeled after HDFC & ICICI Bank Customer Care) */}
-      <div className="bg-gradient-to-r from-[#0A1E3F] via-[#0E2854] to-[#12366F] text-white rounded-xl p-5 sm:p-6 shadow-md border border-blue-900">
+      {/* 24x7 Customer Calling Helplines Banner (Sleek modern design synced with Dashboard) */}
+      <div className="bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-800/80">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="space-y-1 max-w-xl">
-            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-amber-400/20 text-amber-300 text-xs font-semibold uppercase tracking-wider border border-amber-400/30">
+          <div className="space-y-2 max-w-xl">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-bold uppercase tracking-wider border border-indigo-400/30">
               <PhoneCall className="w-3.5 h-3.5" />
-              Need Immediate Assistance? Call Us
+              Priority Assistance &amp; 24x7 Care
             </div>
-            <h2 className="text-lg sm:text-xl font-bold font-serif text-white">
-              24x7 PhoneBanking &amp; Customer Care Helplines
+            <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+              Dedicated PhoneBanking &amp; Redressal Desk
             </h2>
-            <p className="text-xs sm:text-sm text-blue-200 leading-relaxed">
-              Our dedicated banking executives are available around the clock to assist you with cheque books, account statements, debit cards, and dispute resolution.
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-normal">
+              Specialized banking officers are available round-the-clock for cheque book delivery inquiries, statement dispatches, card security, and dispute resolution.
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 shrink-0">
             {/* Helpline 1: Toll-Free */}
-            <div className="bg-white/10 backdrop-blur-xs p-3.5 rounded-lg border border-white/10 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-amber-400 text-slate-950 flex items-center justify-center shrink-0 shadow-xs">
+            <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/15 flex items-center gap-3.5 shadow-xs hover:bg-white/15 transition-all">
+              <div className="w-11 h-11 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center shrink-0 shadow-xs font-bold">
                 <PhoneCall className="w-5 h-5" />
               </div>
               <div>
-                <div className="text-[11px] uppercase tracking-wider text-blue-200 font-semibold">Toll-Free (All India)</div>
-                <a href="tel:18002026161" className="text-base sm:text-lg font-bold text-white hover:text-amber-300 tracking-wide font-mono">
+                <div className="text-[11px] uppercase tracking-wider text-slate-300 font-bold">Toll-Free Support</div>
+                <a href="tel:18002026161" className="text-lg font-black text-white hover:text-amber-300 tracking-wide font-mono transition-colors">
                   1800 202 6161
                 </a>
-                <div className="text-[10px] text-blue-300">Alternate: 1860 267 6161</div>
+                <div className="text-[10px] text-slate-400">Toll-Free • 24x7 Available</div>
               </div>
             </div>
 
             {/* Helpline 2: Emergency Card Block */}
-            <div className="bg-white/10 backdrop-blur-xs p-3.5 rounded-lg border border-white/10 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-red-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+            <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/15 flex items-center gap-3.5 shadow-xs hover:bg-white/15 transition-all">
+              <div className="w-11 h-11 rounded-xl bg-red-500 text-white flex items-center justify-center shrink-0 shadow-xs">
                 <AlertTriangle className="w-5 h-5" />
               </div>
               <div>
-                <div className="text-[11px] uppercase tracking-wider text-red-200 font-semibold">Emergency Card / UPI Block</div>
-                <a href="tel:18001204433" className="text-base sm:text-lg font-bold text-white hover:text-red-300 tracking-wide font-mono">
+                <div className="text-[11px] uppercase tracking-wider text-red-300 font-bold">Emergency Hotline</div>
+                <a href="tel:18001204433" className="text-lg font-black text-white hover:text-red-300 tracking-wide font-mono transition-colors">
                   1800 120 4433
                 </a>
-                <div className="text-[10px] text-red-200">Instant 24x7 Hotlisting</div>
+                <div className="text-[10px] text-red-300">Instant Card / UPI Block</div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Quick Contact Points Row */}
-        <div className="mt-5 pt-4 border-t border-blue-800/80 flex flex-wrap items-center justify-between gap-4 text-xs text-blue-200">
+        {/* Contact Points & SLA Row */}
+        <div className="mt-6 pt-5 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-300">
           <div className="flex items-center gap-2">
             <Mail className="w-4 h-4 text-amber-400" />
-            <span>Email Care: <strong className="text-white">care@indiabank.in</strong></span>
+            <span>Email Care: <strong className="text-white font-medium">care@indiabank.in</strong></span>
           </div>
           <div className="flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-amber-400" />
-            <span>Principal Nodal Office: <strong className="text-white">nodal.officer@indiabank.in (022-6890-1122)</strong></span>
+            <Building2 className="w-4 h-4 text-indigo-400" />
+            <span>Nodal Office: <strong className="text-white font-medium">nodal.officer@indiabank.in (022-6890-1122)</strong></span>
           </div>
-          <div className="flex items-center gap-2 text-slate-300">
+          <div className="flex items-center gap-2">
             <Clock className="w-4 h-4 text-emerald-400" />
-            <span>Grievance Turnaround Time: <strong className="text-emerald-400">Within 24-48 Hours</strong></span>
+            <span>Resolution Turnaround: <strong className="text-emerald-400 font-bold">&lt; 24 Hours Guaranteed</strong></span>
           </div>
         </div>
       </div>
 
-      {/* Support Sub-Navigation Tabs */}
-      <div className="flex border-b border-slate-200 gap-6 text-sm font-semibold">
-        <button
-          onClick={() => setActiveTab('lodge')}
-          className={`pb-3 border-b-2 transition-colors cursor-pointer ${
-            activeTab === 'lodge'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-slate-500 hover:text-slate-900'
-          }`}
-        >
-          Lodge Online Grievance / Service Request
-        </button>
-        <button
-          onClick={() => setActiveTab('channels')}
-          className={`pb-3 border-b-2 transition-colors cursor-pointer ${
-            activeTab === 'channels'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-slate-500 hover:text-slate-900'
-          }`}
-        >
-          Contact Channels &amp; IVR Guide
-        </button>
-        <button
-          onClick={() => setActiveTab('escalation')}
-          className={`pb-3 border-b-2 transition-colors cursor-pointer ${
-            activeTab === 'escalation'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-slate-500 hover:text-slate-900'
-          }`}
-        >
-          RBI 3-Tier Grievance Matrix
-        </button>
+      {/* Support Sub-Navigation Tabs (Modern Segmented Pills) */}
+      <div className="flex items-center">
+        <div className="inline-flex p-1.5 bg-slate-100/90 rounded-2xl border border-slate-200/80 gap-1 text-xs sm:text-sm font-semibold">
+          <button
+            onClick={() => setActiveTab('lodge')}
+            className={`px-4 py-2.5 rounded-xl transition-all cursor-pointer font-bold ${
+              activeTab === 'lodge'
+                ? 'bg-white text-indigo-950 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+            }`}
+          >
+            Lodge Grievance / Request
+          </button>
+          <button
+            onClick={() => setActiveTab('channels')}
+            className={`px-4 py-2.5 rounded-xl transition-all cursor-pointer font-bold ${
+              activeTab === 'channels'
+                ? 'bg-white text-indigo-950 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+            }`}
+          >
+            Contact Channels &amp; IVR Guide
+          </button>
+          <button
+            onClick={() => setActiveTab('escalation')}
+            className={`px-4 py-2.5 rounded-xl transition-all cursor-pointer font-bold ${
+              activeTab === 'escalation'
+                ? 'bg-white text-indigo-950 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+            }`}
+          >
+            3-Tier Escalation Matrix
+          </button>
+        </div>
       </div>
 
       {/* TAB 1: LODGE GRIEVANCE FORM */}
       {activeTab === 'lodge' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
           {/* Main Form Column (Left 8 Cols) */}
           <div className="lg:col-span-8">
             {!isSuccess ? (
-              <div className="bg-white border border-slate-200 rounded-xl p-6 sm:p-8 shadow-xs">
+              <div className="bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-8 shadow-xs">
                 {/* Form Header */}
-                <div className="flex items-center justify-between pb-5 border-b border-slate-100 mb-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-slate-100 mb-6">
                   <div>
-                    <h2 className="text-lg font-bold text-slate-900 font-serif">
+                    <h2 className="text-xl font-bold text-slate-900 tracking-tight">
                       Register Grievance / Service Inquiry
                     </h2>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Direct integration with India Bank Customer Care &amp; Dispute Resolution Desk
+                      Direct integration with India Bank Priority Customer Support Desk
                     </p>
                   </div>
-                  <span className="px-2.5 py-1 text-[11px] font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                    Level 1 Registration
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/80 self-start sm:self-auto">
+                    <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                    Turnaround: &lt; 24 Hours
                   </span>
                 </div>
 
                 {/* Error Banner */}
                 {error && (
-                  <div className="mb-5 p-3.5 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2 animate-fadeIn">
+                  <div className="mb-5 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2 animate-fadeIn">
                     <span className="font-bold text-red-800">Notice:</span>
                     <span>{error}</span>
                   </div>
                 )}
 
                 <form onSubmit={handleSubmit} className="space-y-6">
-                  {/* Account & Customer Details (Read-only pre-filled like real bank) */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-lg bg-slate-50 border border-slate-200/80 text-xs">
+                  {/* Account & Customer Details */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-2xl bg-slate-50/80 border border-slate-200/80 text-xs">
                     <div>
-                      <span className="text-slate-500 block text-[11px] uppercase tracking-wider font-medium">
+                      <span className="text-slate-400 block text-[11px] uppercase tracking-wider font-semibold">
                         Customer Account Number
                       </span>
                       <span className="font-mono font-bold text-slate-900 text-sm">
@@ -366,7 +506,7 @@ Thank you,`,
                       <span className="text-slate-400 block text-[10px]">Regular Savings Account</span>
                     </div>
                     <div>
-                      <span className="text-slate-500 block text-[11px] uppercase tracking-wider font-medium">
+                      <span className="text-slate-400 block text-[11px] uppercase tracking-wider font-semibold">
                         Registered Email Address
                       </span>
                       <span className="font-medium text-slate-900 truncate block">
@@ -380,7 +520,7 @@ Thank you,`,
                   <div>
                     <label
                       htmlFor="product-type-select"
-                      className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5"
+                      className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5"
                     >
                       Product / Department Category <span className="text-red-500">*</span>
                     </label>
@@ -389,7 +529,7 @@ Thank you,`,
                       disabled={isSubmitting}
                       value={productType}
                       onChange={(e) => setProductType(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-all font-sans cursor-pointer disabled:opacity-60"
+                      className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-slate-900 text-sm focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-500/10 transition-all font-sans cursor-pointer disabled:opacity-60"
                     >
                       {COMPLAINT_PRODUCT_TYPES.map((type) => (
                         <option key={type} value={type}>
@@ -397,35 +537,35 @@ Thank you,`,
                         </option>
                       ))}
                     </select>
-                    <p className="text-[11px] text-slate-500 mt-1">
-                      Select the specialized category to route directly to the designated dispute department.
+                    <p className="text-[11px] text-slate-400 mt-1.5">
+                      Select the category to route your ticket directly to the specialized grievance team.
                     </p>
                   </div>
 
-                  {/* USER REQUESTED TEMPLATES: Quick Sample Complaints Ready (Click to fill) */}
+                  {/* Quick Sample Complaints (Click to Auto-Fill) */}
                   <div className="pt-2 pb-1">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs uppercase tracking-wider text-slate-600 font-bold flex items-center gap-1.5">
+                    <div className="flex items-center justify-between mb-2.5">
+                      <span className="text-xs uppercase tracking-wider text-slate-700 font-bold flex items-center gap-1.5">
                         <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                        Quick Sample Complaints (Click to Auto-Fill)
+                        Quick Sample Templates (Click to Auto-Fill)
                       </span>
-                      <span className="text-[11px] text-slate-400">One-click template pre-fill</span>
+                      <span className="text-[11px] text-slate-400 font-medium">1-Click Pre-fill</span>
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="space-y-2.5">
                       {sampleTemplates.map((tmpl) => (
                         <button
                           key={tmpl.id}
                           type="button"
                           disabled={isSubmitting}
                           onClick={() => handleApplyTemplate(tmpl)}
-                          className="w-full text-left p-3 rounded-lg border border-slate-200 hover:border-blue-400 hover:bg-blue-50/40 bg-white transition-all cursor-pointer group flex flex-col gap-1 shadow-2xs"
+                          className="w-full text-left p-3.5 rounded-2xl border border-slate-200/80 hover:border-indigo-400 hover:bg-indigo-50/40 bg-white transition-all cursor-pointer group flex flex-col gap-1 shadow-2xs"
                         >
                           <div className="flex items-center justify-between">
-                            <span className="font-semibold text-xs text-slate-800 group-hover:text-blue-700">
+                            <span className="font-bold text-xs text-slate-800 group-hover:text-indigo-700">
                               {tmpl.title}
                             </span>
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 group-hover:bg-blue-100 text-slate-600 group-hover:text-blue-800 font-medium">
+                            <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-slate-100 group-hover:bg-indigo-100 text-slate-600 group-hover:text-indigo-800 font-semibold">
                               {tmpl.badge}
                             </span>
                           </div>
@@ -442,7 +582,7 @@ Thank you,`,
                     <div className="flex items-center justify-between mb-1.5">
                       <label
                         htmlFor="complaint-details-textarea"
-                        className="block text-xs font-semibold uppercase tracking-wider text-slate-700"
+                        className="block text-xs font-bold uppercase tracking-wider text-slate-700"
                       >
                         Complaint / Request Details <span className="text-red-500">*</span>
                       </label>
@@ -458,21 +598,21 @@ Thank you,`,
                       value={complaintDetails}
                       onChange={(e) => setComplaintDetails(e.target.value)}
                       placeholder="Please describe your grievance or request in detail. State the date of incident, SMS alerts received, or required period (e.g. Account statement period)."
-                      className="w-full p-3.5 bg-white border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-all font-sans leading-relaxed disabled:opacity-60"
+                      className="w-full p-4 bg-white border border-slate-200 rounded-2xl text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-500/10 transition-all font-sans leading-relaxed disabled:opacity-60"
                     />
-                    <p className="text-[11px] text-slate-500 mt-1 flex items-center gap-1.5">
-                      <HelpCircle className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                      Please include relevant transaction dates, dispatch SMS timestamps, or specific statement date ranges.
+                    <p className="text-[11px] text-slate-400 mt-1.5 flex items-center gap-1.5">
+                      <HelpCircle className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                      Resolution is committed within less than 24 hours of ticket submission.
                     </p>
                   </div>
 
-                  {/* Supporting Document Attachment Simulation (Standard in HDFC / ICICI Grievance) */}
+                  {/* Supporting Document Attachment */}
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
                       Supporting Document / Screenshot (Optional)
                     </label>
                     <div className="flex items-center gap-3">
-                      <label className="px-3.5 py-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-300 text-slate-700 text-xs font-medium cursor-pointer flex items-center gap-2 transition-colors">
+                      <label className="px-4 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-semibold cursor-pointer flex items-center gap-2 transition-colors">
                         <Paperclip className="w-3.5 h-3.5 text-slate-500" />
                         <span>{attachedFileName ? 'Change Attachment' : 'Attach Screenshot or PDF'}</span>
                         <input
@@ -485,9 +625,9 @@ Thank you,`,
                         />
                       </label>
                       {attachedFileName && (
-                        <div className="flex items-center gap-2 text-xs bg-emerald-50 text-emerald-800 px-3 py-1.5 rounded-lg border border-emerald-200">
+                        <div className="flex items-center gap-2 text-xs bg-emerald-50 text-emerald-800 px-3 py-1.5 rounded-xl border border-emerald-200">
                           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                          <span className="truncate max-w-[200px]">{attachedFileName}</span>
+                          <span className="truncate max-w-[200px] font-medium">{attachedFileName}</span>
                           <button
                             type="button"
                             onClick={() => setAttachedFileName('')}
@@ -501,13 +641,13 @@ Thank you,`,
                   </div>
 
                   {/* Customer Declaration & Submit Button */}
-                  <div className="pt-3 border-t border-slate-100 space-y-4">
+                  <div className="pt-4 border-t border-slate-100 space-y-4">
                     <div className="text-[11px] text-slate-500 flex items-start gap-2">
                       <input
                         type="checkbox"
                         id="declaration-checkbox"
                         defaultChecked
-                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 mt-0.5"
+                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 mt-0.5"
                       />
                       <label htmlFor="declaration-checkbox" className="cursor-pointer">
                         I hereby declare that the particulars provided above pertain to my India Bank account and are true to the best of my knowledge.
@@ -518,11 +658,11 @@ Thank you,`,
                       type="submit"
                       id="submit-complaint-btn"
                       disabled={isSubmitting}
-                      className="w-full py-3.5 px-4 rounded-lg bg-[#0A1E3F] hover:bg-[#0E2854] text-white font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed group"
+                      className="w-full py-4 px-6 rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed group"
                     >
                       {isSubmitting ? (
                         <>
-                          <RefreshCw className="w-4 h-4 text-amber-400 animate-spin" />
+                          <RefreshCw className="w-4 h-4 text-amber-300 animate-spin" />
                           <span>
                             {loadingStep === 'authenticating' && 'Authenticating with India Bank Gateway...'}
                             {loadingStep === 'submitting' && 'Dispatching Grievance to MagicPlatform...'}
@@ -531,7 +671,7 @@ Thank you,`,
                         </>
                       ) : (
                         <>
-                          <Send className="w-4 h-4 text-amber-400 group-hover:translate-x-0.5 transition-transform" />
+                          <Send className="w-4 h-4 text-amber-300 group-hover:translate-x-0.5 transition-transform" />
                           <span>Submit Grievance to India Bank Desk</span>
                         </>
                       )}
@@ -540,14 +680,14 @@ Thank you,`,
                 </form>
               </div>
             ) : (
-              /* SUCCESS STATE (Compliant with User Prompt: NO Reference Number Displayed) */
-              <div className="bg-white border border-slate-200 rounded-xl p-8 sm:p-10 shadow-xs text-center space-y-6">
-                <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto shadow-xs">
+              /* SUCCESS STATE (NO Reference Number Displayed) */
+              <div className="bg-white border border-slate-200/80 rounded-3xl p-8 sm:p-12 shadow-xs text-center space-y-6">
+                <div className="w-16 h-16 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto shadow-xs">
                   <CheckCircle2 className="w-9 h-9" />
                 </div>
 
                 <div className="space-y-2 max-w-md mx-auto">
-                  <h2 className="text-2xl font-bold text-slate-900 font-serif">
+                  <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
                     Your complaint has been received!
                   </h2>
                   <p className="text-slate-600 text-sm leading-relaxed">
@@ -555,11 +695,11 @@ Thank you,`,
                   </p>
                 </div>
 
-                {/* Ticket Summary Card (No reference number displayed, strictly as requested) */}
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 text-left max-w-lg mx-auto space-y-4">
+                {/* Ticket Summary Card */}
+                <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-6 text-left max-w-lg mx-auto space-y-4">
                   <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-                    <span className="text-xs font-semibold text-slate-700">Grievance Status</span>
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-semibold text-xs">
+                    <span className="text-xs font-bold text-slate-700">Grievance Status</span>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
                       Dispatched to Resolution Queue
                     </span>
@@ -568,26 +708,26 @@ Thank you,`,
                   {/* Summary grid */}
                   <div className="grid grid-cols-2 gap-3 text-xs">
                     <div>
-                      <span className="text-slate-500 block text-[11px]">Department / Product</span>
-                      <span className="font-semibold text-slate-800">{productType}</span>
+                      <span className="text-slate-400 block text-[11px] font-semibold">Department / Product</span>
+                      <span className="font-bold text-slate-800">{productType}</span>
                     </div>
                     <div>
-                      <span className="text-slate-500 block text-[11px]">Target Account</span>
-                      <span className="font-semibold font-mono text-slate-800">AC1000234567</span>
+                      <span className="text-slate-400 block text-[11px] font-semibold">Target Account</span>
+                      <span className="font-bold font-mono text-slate-800">AC1000234567</span>
                     </div>
                     <div>
-                      <span className="text-slate-500 block text-[11px]">Registered Recipient</span>
-                      <span className="font-semibold text-slate-800 truncate block">{user.email}</span>
+                      <span className="text-slate-400 block text-[11px] font-semibold">Registered Recipient</span>
+                      <span className="font-bold text-slate-800 truncate block">{user.email}</span>
                     </div>
                     <div>
-                      <span className="text-slate-500 block text-[11px]">Submission Time</span>
-                      <span className="font-semibold text-slate-800">{submissionTimestamp || 'Just now'}</span>
+                      <span className="text-slate-400 block text-[11px] font-semibold">Target Resolution</span>
+                      <span className="font-bold text-emerald-600">&lt; 24 Hours Guaranteed</span>
                     </div>
                   </div>
 
                   <div className="pt-3 border-t border-slate-200 text-xs text-slate-600">
                     <p className="italic">
-                      "Our customer resolution team at India Bank is reviewing your request."
+                      "Our customer resolution team at India Bank is actively handling your request under our 24-hour turnaround SLA."
                     </p>
                   </div>
                 </div>
@@ -596,13 +736,13 @@ Thank you,`,
                 <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
                   <button
                     onClick={onReturnToDashboard}
-                    className="w-full sm:w-auto px-6 py-2.5 rounded-lg bg-[#0A1E3F] hover:bg-[#0E2854] text-white font-semibold text-sm transition-colors cursor-pointer"
+                    className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm transition-colors cursor-pointer shadow-sm"
                   >
                     Return to NetBanking Dashboard
                   </button>
                   <button
                     onClick={handleResetForm}
-                    className="w-full sm:w-auto px-6 py-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm transition-colors cursor-pointer border border-slate-200"
+                    className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm transition-colors cursor-pointer border border-slate-200/80"
                   >
                     Lodge Another Request
                   </button>
@@ -611,78 +751,87 @@ Thank you,`,
             )}
           </div>
 
-          {/* Right Column: Banking Advice & PhoneBanking Guide (4 Cols) */}
+          {/* Right Column: Banking Advice & PhoneBanking Guide */}
           <div className="lg:col-span-4 space-y-6">
-            {/* PhoneBanking Calling Tree Card (Like HDFC & ICICI Bank) */}
-            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
-              <div className="flex items-center gap-2 text-slate-900 font-serif font-bold text-sm">
-                <PhoneCall className="w-4 h-4 text-amber-500" />
-                <span>PhoneBanking IVR Calling Guide</span>
+            {/* PhoneBanking Calling Tree Card */}
+            <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-xs space-y-4">
+              <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+                <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
+                  <PhoneCall className="w-4 h-4" />
+                </div>
+                <span>PhoneBanking IVR Menu Guide</span>
               </div>
 
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <p className="text-xs text-slate-500 leading-relaxed">
                 When calling <strong className="text-slate-900">1800 202 6161</strong>, follow this key hierarchy for faster routing:
               </p>
 
               <div className="space-y-2 text-xs font-mono">
-                <div className="p-2 rounded bg-slate-50 border border-slate-200 flex items-center justify-between">
-                  <span>Press 1</span>
+                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 flex items-center justify-between">
+                  <span className="font-bold text-slate-900">Press 1</span>
                   <span className="font-sans font-medium text-slate-700">Savings &amp; Current A/C</span>
                 </div>
-                <div className="p-2 rounded bg-slate-50 border border-slate-200 flex items-center justify-between">
-                  <span>Press 2</span>
+                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 flex items-center justify-between">
+                  <span className="font-bold text-slate-900">Press 2</span>
                   <span className="font-sans font-medium text-slate-700">Cheque Book Status</span>
                 </div>
-                <div className="p-2 rounded bg-slate-50 border border-slate-200 flex items-center justify-between">
-                  <span>Press 3</span>
+                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 flex items-center justify-between">
+                  <span className="font-bold text-slate-900">Press 3</span>
                   <span className="font-sans font-medium text-slate-700">Account Statement</span>
                 </div>
-                <div className="p-2 rounded bg-slate-50 border border-slate-200 flex items-center justify-between">
-                  <span>Press 4</span>
+                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 flex items-center justify-between">
+                  <span className="font-bold text-slate-900">Press 4</span>
                   <span className="font-sans font-medium text-slate-700">Debit Card Block</span>
                 </div>
-                <div className="p-2 rounded bg-amber-50 border border-amber-200 text-amber-900 flex items-center justify-between">
-                  <span className="font-bold">Press 9</span>
+                <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 flex items-center justify-between">
+                  <span className="font-black">Press 9</span>
                   <span className="font-sans font-bold">Speak to Executive</span>
                 </div>
               </div>
             </div>
 
-            {/* Service Turnaround Commitment (RBI Charter) */}
-            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-3">
-              <div className="flex items-center gap-2 text-slate-900 font-serif font-bold text-sm">
-                <Clock className="w-4 h-4 text-blue-600" />
-                <span>Service Standards (RBI Charter)</span>
+            {/* Service Turnaround Commitment */}
+            <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-xs space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                    <Clock className="w-4 h-4" />
+                  </div>
+                  <span>Service Standards &amp; SLA</span>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900">
+                  &lt; 24h Target
+                </span>
               </div>
 
-              <div className="space-y-2.5 text-xs text-slate-600">
-                <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
-                  <span>Cheque Book Delivery</span>
-                  <span className="font-semibold text-slate-900">3-5 Working Days</span>
+              <div className="space-y-3 text-xs text-slate-600">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <span className="font-medium">Dispute &amp; Grievance Resolution</span>
+                  <span className="font-bold text-emerald-600">&lt; 24 Hours Guaranteed</span>
                 </div>
-                <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                   <span>Statement via Email</span>
-                  <span className="font-semibold text-emerald-600">Instant to 2 Hours</span>
+                  <span className="font-semibold text-emerald-600">Instant to 1 Hour</span>
                 </div>
-                <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
-                  <span>Disputed Transaction</span>
-                  <span className="font-semibold text-slate-900">7 Working Days</span>
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <span>Cheque Book Delivery</span>
+                  <span className="font-semibold text-slate-900">24 - 48 Hours</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span>Card Hotlisting</span>
-                  <span className="font-semibold text-emerald-600">Immediate</span>
+                  <span>Emergency Card Hotlisting</span>
+                  <span className="font-semibold text-emerald-600">Immediate (&lt; 60s)</span>
                 </div>
               </div>
             </div>
 
             {/* Security Notice */}
-            <div className="p-4 rounded-xl bg-amber-50/80 border border-amber-200 text-xs text-amber-900 space-y-1">
+            <div className="p-5 rounded-3xl bg-amber-50/80 border border-amber-200/90 text-xs text-amber-950 space-y-1.5 shadow-2xs">
               <div className="font-bold flex items-center gap-1.5 text-amber-950">
                 <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
                 Customer Advisory
               </div>
-              <p className="leading-relaxed">
-                India Bank officials will never ask for your NetBanking Password, OTP, or CVV. Report suspicious calls immediately to 1800 120 4433.
+              <p className="leading-relaxed text-amber-900">
+                India Bank officials will never ask for your NetBanking Password, OTP, or Card CVV. Report suspicious calls immediately to 1800 120 4433.
               </p>
             </div>
           </div>
@@ -691,49 +840,49 @@ Thank you,`,
 
       {/* TAB 2: CONTACT CHANNELS & PHONE NUMBERS */}
       {activeTab === 'channels' && (
-        <div className="bg-white border border-slate-200 rounded-xl p-6 sm:p-8 shadow-xs space-y-6">
+        <div className="bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
           <div>
-            <h3 className="text-lg font-bold text-slate-900 font-serif">
+            <h3 className="text-xl font-bold text-slate-900 tracking-tight">
               Customer Support Calling Numbers &amp; Contact Desks
             </h3>
             <p className="text-xs text-slate-500 mt-1">
-              Reach out to our specialized support wings across India and overseas.
+              Reach out to our specialized support teams across India and overseas.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-5 rounded-xl border border-slate-200 bg-slate-50/60 space-y-2">
-              <div className="w-9 h-9 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div className="p-6 rounded-2xl border border-slate-200/80 bg-slate-50/60 space-y-3 shadow-2xs">
+              <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
                 <PhoneCall className="w-5 h-5" />
               </div>
               <h4 className="font-bold text-slate-900 text-sm">Domestic Retail Banking</h4>
-              <p className="text-xs text-slate-500">For Savings, Current A/C, Cheques, Statements</p>
+              <p className="text-xs text-slate-500 leading-relaxed">For Savings, Current A/C, Cheques, Statements</p>
               <div className="pt-2">
-                <div className="text-base font-bold font-mono text-blue-700">1800 202 6161</div>
-                <div className="text-[11px] text-slate-400">Toll-Free, 24 Hours a day, 7 days a week</div>
+                <div className="text-lg font-bold font-mono text-indigo-700">1800 202 6161</div>
+                <div className="text-[11px] text-slate-400">Toll-Free • 24 Hours a day, 7 days a week</div>
               </div>
             </div>
 
-            <div className="p-5 rounded-xl border border-slate-200 bg-slate-50/60 space-y-2">
-              <div className="w-9 h-9 rounded-lg bg-red-100 text-red-700 flex items-center justify-center font-bold">
+            <div className="p-6 rounded-2xl border border-slate-200/80 bg-slate-50/60 space-y-3 shadow-2xs">
+              <div className="w-10 h-10 rounded-xl bg-red-100 text-red-700 flex items-center justify-center font-bold">
                 <AlertTriangle className="w-5 h-5" />
               </div>
               <h4 className="font-bold text-slate-900 text-sm">Emergency Hotlisting</h4>
-              <p className="text-xs text-slate-500">Block Debit Card, NetBanking, or report fraudulent UPI</p>
+              <p className="text-xs text-slate-500 leading-relaxed">Block Debit Card, NetBanking, or report fraudulent UPI</p>
               <div className="pt-2">
-                <div className="text-base font-bold font-mono text-red-600">1800 120 4433</div>
+                <div className="text-lg font-bold font-mono text-red-600">1800 120 4433</div>
                 <div className="text-[11px] text-slate-400">Dedicated Rapid Response Helpline</div>
               </div>
             </div>
 
-            <div className="p-5 rounded-xl border border-slate-200 bg-slate-50/60 space-y-2">
-              <div className="w-9 h-9 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+            <div className="p-6 rounded-2xl border border-slate-200/80 bg-slate-50/60 space-y-3 shadow-2xs">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
                 <Building2 className="w-5 h-5" />
               </div>
               <h4 className="font-bold text-slate-900 text-sm">NRI &amp; Overseas Desk</h4>
-              <p className="text-xs text-slate-500">For NRE/NRO accounts and foreign outward remittances</p>
+              <p className="text-xs text-slate-500 leading-relaxed">For NRE/NRO accounts and foreign outward remittances</p>
               <div className="pt-2">
-                <div className="text-base font-bold font-mono text-slate-900">+91 22 6789 2000</div>
+                <div className="text-lg font-bold font-mono text-slate-900">+91 22 6789 2000</div>
                 <div className="text-[11px] text-slate-400">Standard ISD rates apply</div>
               </div>
             </div>
@@ -741,51 +890,51 @@ Thank you,`,
         </div>
       )}
 
-      {/* TAB 3: RBI 3-TIER GRIEVANCE MATRIX */}
+      {/* TAB 3: 3-TIER GRIEVANCE MATRIX */}
       {activeTab === 'escalation' && (
-        <div className="bg-white border border-slate-200 rounded-xl p-6 sm:p-8 shadow-xs space-y-6">
+        <div className="bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
           <div>
-            <h3 className="text-lg font-bold text-slate-900 font-serif">
-              RBI Mandated 3-Tier Grievance Redressal Mechanism
+            <h3 className="text-xl font-bold text-slate-900 tracking-tight">
+              3-Tier Customer Grievance Redressal Mechanism
             </h3>
             <p className="text-xs text-slate-500 mt-1">
-              If your grievance is not resolved to your satisfaction, you may escalate in accordance with the Reserve Bank of India framework.
+              If your grievance requires additional review, our structured institutional escalation channels ensure rapid resolution.
             </p>
           </div>
 
           <div className="space-y-4">
-            <div className="p-4 rounded-xl border border-blue-200 bg-blue-50/40 flex items-start gap-4">
-              <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
+            <div className="p-5 rounded-2xl border border-indigo-200 bg-indigo-50/40 flex items-start gap-4">
+              <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
                 1
               </div>
               <div>
-                <h4 className="font-bold text-slate-900 text-sm">Level 1: Branch Manager / Online Grievance Portal</h4>
+                <h4 className="font-bold text-slate-900 text-sm">Level 1: Customer Support Desk / Branch Manager</h4>
                 <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                  Lodge your grievance via this online portal or by calling PhoneBanking at 1800 202 6161. Expected resolution time: Within 7 working days.
+                  Lodge your grievance via this online portal or by calling PhoneBanking at 1800 202 6161. <strong className="text-indigo-900">Turnaround time: Guaranteed less than 24 hours.</strong>
                 </p>
               </div>
             </div>
 
-            <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/40 flex items-start gap-4">
+            <div className="p-5 rounded-2xl border border-amber-200 bg-amber-50/40 flex items-start gap-4">
               <div className="w-8 h-8 rounded-full bg-amber-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
                 2
               </div>
               <div>
                 <h4 className="font-bold text-slate-900 text-sm">Level 2: Principal Nodal Officer</h4>
                 <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                  If the resolution provided at Level 1 does not meet your expectation within 7 days, you may write directly to our Principal Nodal Officer at <strong>nodal.officer@indiabank.in</strong> or call 022-6890-1122.
+                  If the resolution provided at Level 1 requires escalation, you may write directly to our Principal Nodal Officer at <strong>nodal.officer@indiabank.in</strong> or call 022-6890-1122.
                 </p>
               </div>
             </div>
 
-            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 flex items-start gap-4">
+            <div className="p-5 rounded-2xl border border-slate-200 bg-slate-50 flex items-start gap-4">
               <div className="w-8 h-8 rounded-full bg-slate-700 text-white flex items-center justify-center font-bold text-sm shrink-0">
                 3
               </div>
               <div>
-                <h4 className="font-bold text-slate-900 text-sm">Level 3: Reserve Bank of India Banking Ombudsman</h4>
+                <h4 className="font-bold text-slate-900 text-sm">Level 3: Executive Committee &amp; Banking Ombudsman</h4>
                 <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                  If your complaint remains unaddressed for 30 days from the initial lodging date, you can approach the RBI Ombudsman scheme online at <a href="https://cms.rbi.org.in" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">cms.rbi.org.in</a>.
+                  If your complaint remains unaddressed beyond designated institutional windows, you can approach the independent Banking Ombudsman scheme online at <a href="https://cms.rbi.org.in" target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline font-semibold">cms.rbi.org.in</a>.
                 </p>
               </div>
             </div>

@@ -39,7 +39,7 @@ export const NexoraSidebar: React.FC<NexoraSidebarProps> = ({
   const navItems: NavItem[] = [
     { id: 'home', label: 'Home', icon: Home },
     { id: 'accounts', label: 'Accounts', icon: Building2 },
-    { id: 'complaints', label: 'Grievance & Disputes', icon: PhoneCall, badge: 'RBI Desk' },
+    { id: 'complaints', label: 'Grievance and Dispute', icon: PhoneCall },
     { id: 'cards', label: 'Cards', icon: CreditCard },
     { id: 'payments', label: 'Payments', icon: Send },
     { id: 'transfers', label: 'Transfers', icon: ArrowLeftRight },

@@ -165,12 +165,12 @@ export const NexoraDashboard: React.FC<NexoraDashboardProps> = ({
                   <h4 className="font-bold text-slate-900 text-sm sm:text-base">
                     Customer Grievance &amp; Dispute Redressal Desk
                   </h4>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 uppercase">
-                    Level 1 Desk
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 uppercase">
+                    &lt; 24h Resolution
                   </span>
                 </div>
                 <p className="text-xs text-slate-600 max-w-xl leading-relaxed">
-                  Lodge official service inquiries, cheque book dispatch disputes, or tax statements. Features 3 pre-filled templates &amp; real-time MagicPlatform integration.
+                  Lodge official service inquiries, cheque book dispatch disputes, or tax statements with guaranteed turnaround under 24 hours. Features 3 instant pre-fill templates.
                 </p>
               </div>
             </div>

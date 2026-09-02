@@ -48,7 +48,7 @@ export const NexoraAiAssistant: React.FC<NexoraAiAssistantProps> = ({
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       quickActions: [
         { label: 'Check Balance', action: 'balance' },
-        { label: 'File Grievance / RBI Ticket', action: 'grievance' },
+        { label: 'File Grievance Ticket (< 24h)', action: 'grievance' },
         { label: 'FD Interest Rates', action: 'fd_rate' },
         { label: 'Report Lost Card', action: 'block_card' },
       ],
@@ -89,23 +89,23 @@ export const NexoraAiAssistant: React.FC<NexoraAiAssistantProps> = ({
           { label: 'Download Statement', action: 'statement' },
           { label: 'Send Money', action: 'send_money' },
         ];
-      } else if (lower.includes('grievance') || lower.includes('complaint') || lower.includes('rbi')) {
-        replyText = `Under RBI's Integrated Ombudsman Scheme, you can file an official grievance ticket for any issue (transaction failure, unauthorized debit, card dispute). Tickets are assigned an instant tracking ID.`;
+      } else if (lower.includes('grievance') || lower.includes('complaint')) {
+        replyText = `Our Customer Care & Grievance Desk ensures a guaranteed resolution turnaround time of less than 24 hours for all service requests, cheque inquiries, and account statements.`;
         replyActions = [
           { label: 'Open Grievance Portal', action: 'grievance' },
         ];
       } else if (lower.includes('rate') || lower.includes('fd') || lower.includes('fixed deposit')) {
-        replyText = `Nexora Bank offers up to 6.75% p.a. on Fixed Deposits for general citizens (7.25% p.a. for Senior Citizens) for tenures of 18 to 36 months. Interest is compounded quarterly.`;
+        replyText = `India Bank offers up to 6.75% p.a. on Fixed Deposits for general citizens (7.25% p.a. for Senior Citizens) for tenures of 18 to 36 months. Interest is compounded quarterly.`;
         replyActions = [
           { label: 'Book FD Now', action: 'open_fd' },
         ];
       } else if (lower.includes('card') || lower.includes('lost') || lower.includes('block') || lower.includes('freeze')) {
-        replyText = `To protect your funds, you can instantly freeze your Nexora Royale Infinite or Debit card from the Cards tab. No transactions will be allowed until you unfreeze it.`;
+        replyText = `To protect your funds, you can instantly freeze your India Bank Royale Infinite or Debit card from the Cards tab. No transactions will be allowed until you unfreeze it.`;
         replyActions = [
           { label: 'Go to Cards', action: 'cards' },
         ];
       } else {
-        replyText = `I understand you are asking regarding "${text}". You can manage transfers, check CIBIL score, download account statements, or file RBI compliant grievances anytime!`;
+        replyText = `I understand you are asking regarding "${text}". You can manage transfers, check CIBIL score, download account statements, or lodge customer grievances (< 24h turnaround) anytime!`;
         replyActions = [
           { label: 'Check Balance', action: 'balance' },
           { label: 'Send Money', action: 'send_money' },
